@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 
 cmake_policy(SET CMP0135 NEW)
 
-project(ImGuiSDL3WGPUExample)
+project(LeafEdit)
 
 include(FetchContent)
 
@@ -21,7 +21,6 @@ find_package(Freetype REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 
-# [수정] 리눅스 시스템에서 OpenGL 라이브러리를 찾습니다.
 find_package(OpenGL REQUIRED)
 
 add_library(imgui_SDL3 STATIC
@@ -49,9 +48,14 @@ target_include_directories(imgui_SDL3 PUBLIC
   ${imgui_SOURCE_DIR}
   ${imgui_SOURCE_DIR}/backends
   ${imgui_SOURCE_DIR}/misc/freetype
+  ${FONTCONFIG_INCLUDE_DIRS}
 )
 
 add_executable(leafedit src/main.cpp)
+
+target_include_directories(leafedit PRIVATE 
+    ${FONTCONFIG_INCLUDE_DIRS}
+)
 
 target_link_libraries(leafedit PRIVATE 
     imgui_SDL3

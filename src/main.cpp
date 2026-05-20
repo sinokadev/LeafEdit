@@ -249,6 +249,7 @@ int main(int, char **) {
     static int m_CursorLine = 0;
     static int m_CursorByteOffset = 0;
     static bool m_IsDirty = false;
+    static bool m_CursorChanged = false;
 
     static std::string m_CompositionText = "";
 
@@ -289,6 +290,7 @@ int main(int, char **) {
                         m_Lines.erase(m_Lines.begin() + m_CursorLine);
                         m_CursorLine--;
                     }
+                    m_CursorChanged = true;
                 }
 
                 if (event.key.key == SDLK_RETURN) {
@@ -303,6 +305,8 @@ int main(int, char **) {
                     m_CursorLine++;
 
                     m_CursorByteOffset = 0;
+
+                    m_CursorChanged = true;
                 }
 
                 if ((SDL_GetModState() & SDLK_LCTRL) && event.key.key == SDLK_S) {
@@ -348,6 +352,8 @@ int main(int, char **) {
                 if (m_CursorByteOffset > (int)m_Lines[m_CursorLine].size()) {
                     m_CursorByteOffset = (int)m_Lines[m_CursorLine].size();
                 }
+
+                m_CursorChanged = true;
             }
         }
 
@@ -368,89 +374,114 @@ int main(int, char **) {
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!", nullptr, window_flags);
+            ImGui::Begin("LeafEdit", nullptr, window_flags);
 
-            ImDrawList *draw_list = ImGui::GetWindowDrawList();
-            ImVec2 start_pos = ImGui::GetCursorScreenPos();
+            ImVec2 nav_bar_size = ImGui::GetContentRegionAvail();
 
-            ImFont *current_font = ImGui::GetFont();
-            float total_line_height = ImGui::GetTextLineHeight() + 6.0f;
-            float char_width =
-                current_font
-                    ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, "A")
-                    .x;
+            if (ImGui::BeginChild("Editor", nav_bar_size, ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar)) {
+                ImDrawList *draw_list = ImGui::GetWindowDrawList();
+                ImVec2 start_pos = ImGui::GetCursorScreenPos();
 
-            for (size_t i = 0; i < m_Lines.size(); i++) {
-                float box_top_y = start_pos.y + (i * total_line_height);
-                float text_draw_y = box_top_y + 3.0f;
-                char num_buf[16];
-                sprintf(num_buf, "%3zu", i + 1);
-                draw_list->AddText(ImVec2(start_pos.x + 10.0f, text_draw_y),
-                                   ImColor(120, 120, 120), num_buf);
+                float max_width = 100.0f;
+                float total_height = m_Lines.size() * (ImGui::GetTextLineHeight() + 6.0f);
 
-                float text_start_x = start_pos.x + 60.0f;
+                for (const auto& line : m_Lines) {
+                    float line_w = ImGui::CalcTextSize(line.c_str()).x + 80.0f;
+                    if (line_w > max_width) max_width = line_w;
+                }
 
-                if (i == (size_t)m_CursorLine) {
+                ImGui::Dummy(ImVec2(max_width, total_height));
+                
+                if (m_CursorChanged) {
+                    float line_height = ImGui::GetTextLineHeight() + 6.0f;
+                    float target_y = start_pos.y + (m_CursorLine * line_height);
 
-                    size_t safe_offset = m_CursorByteOffset;
-                    if (safe_offset > m_Lines[i].size())
-                        safe_offset = m_Lines[i].size();
+                    ImGui::SetScrollFromPosY(target_y - ImGui::GetWindowPos().y, 0.5f);
+                    
+                    m_CursorChanged = false;
+                }
 
-                    std::string left_text = m_Lines[i].substr(0, safe_offset);
-                    draw_list->AddText(ImVec2(text_start_x, text_draw_y),
-                                       ImColor(30, 30, 30), left_text.c_str());
+                ImFont *current_font = ImGui::GetFont();
+                float total_line_height = ImGui::GetTextLineHeight() + 6.0f;
+                float char_width =
+                    current_font
+                        ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, "A")
+                        .x;
 
-                    float left_width =
-                        current_font
-                            ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX,
-                                            -1.0f, left_text.c_str())
-                            .x;
-                    float current_x = text_start_x + left_width;
+                for (size_t i = 0; i < m_Lines.size(); i++) {
+                    float box_top_y = start_pos.y + (i * total_line_height);
+                    float text_draw_y = box_top_y + 3.0f;
+                    char num_buf[16];
+                    sprintf(num_buf, "%3zu", i + 1);
+                    draw_list->AddText(ImVec2(start_pos.x + 10.0f, text_draw_y),
+                                    ImColor(120, 120, 120), num_buf);
 
-                    float cursor_x = text_start_x + left_width;
-                    float cursor_y = box_top_y;
+                    float text_start_x = start_pos.x + 60.0f;
 
-                    SDL_Rect area = {(int)cursor_x, (int)cursor_y, 1,
-                                     (int)total_line_height};
-                    SDL_SetTextInputArea(window, &area, 0);
-                    if (!m_CompositionText.empty()) {
-                        draw_list->AddText(ImVec2(current_x, text_draw_y),
-                                           ImColor(100, 100, 100),
-                                           m_CompositionText.c_str());
+                    if (i == (size_t)m_CursorLine) {
 
-                        float comp_width =
+                        size_t safe_offset = m_CursorByteOffset;
+                        if (safe_offset > m_Lines[i].size())
+                            safe_offset = m_Lines[i].size();
+
+                        std::string left_text = m_Lines[i].substr(0, safe_offset);
+                        draw_list->AddText(ImVec2(text_start_x, text_draw_y),
+                                        ImColor(30, 30, 30), left_text.c_str());
+
+                        float left_width =
                             current_font
                                 ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX,
-                                                -1.0f,
-                                                m_CompositionText.c_str())
+                                                -1.0f, left_text.c_str())
                                 .x;
+                        float current_x = text_start_x + left_width;
 
-                        draw_list->AddLine(
-                            ImVec2(current_x,
-                                   box_top_y + total_line_height - 2.0f),
-                            ImVec2(current_x + comp_width,
-                                   box_top_y + total_line_height - 2.0f),
-                            ImColor(100, 100, 100), 1.5f);
+                        float cursor_x = text_start_x + left_width;
+                        float cursor_y = box_top_y;
 
-                        current_x += comp_width;
-                    } else {
-                        if (fmod(ImGui::GetTime(), 1.0f) < 0.5f) {
-                            draw_list->AddRectFilled(
-                                ImVec2(current_x, box_top_y + 2.0f),
-                                ImVec2(current_x + 2.0f,
-                                       box_top_y + total_line_height - 2.0f),
-                                ImColor(0, 0, 0));
+                        SDL_Rect area = {(int)cursor_x, (int)cursor_y, 1,
+                                        (int)total_line_height};
+                        SDL_SetTextInputArea(window, &area, 0);
+                        if (!m_CompositionText.empty()) {
+                            draw_list->AddText(ImVec2(current_x, text_draw_y),
+                                            ImColor(100, 100, 100),
+                                            m_CompositionText.c_str());
+
+                            float comp_width =
+                                current_font
+                                    ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX,
+                                                    -1.0f,
+                                                    m_CompositionText.c_str())
+                                    .x;
+
+                            draw_list->AddLine(
+                                ImVec2(current_x,
+                                    box_top_y + total_line_height - 2.0f),
+                                ImVec2(current_x + comp_width,
+                                    box_top_y + total_line_height - 2.0f),
+                                ImColor(100, 100, 100), 1.5f);
+
+                            current_x += comp_width;
+                        } else {
+                            if (fmod(ImGui::GetTime(), 1.0f) < 0.5f) {
+                                draw_list->AddRectFilled(
+                                    ImVec2(current_x, box_top_y + 2.0f),
+                                    ImVec2(current_x + 2.0f,
+                                        box_top_y + total_line_height - 2.0f),
+                                    ImColor(0, 0, 0));
+                            }
                         }
-                    }
 
-                    std::string right_text = m_Lines[i].substr(safe_offset);
-                    draw_list->AddText(ImVec2(current_x, text_draw_y),
-                                       ImColor(30, 30, 30), right_text.c_str());
-                } else {
-                    draw_list->AddText(ImVec2(text_start_x, text_draw_y),
-                                       ImColor(30, 30, 30), m_Lines[i].c_str());
+                        std::string right_text = m_Lines[i].substr(safe_offset);
+                        draw_list->AddText(ImVec2(current_x, text_draw_y),
+                                        ImColor(30, 30, 30), right_text.c_str());
+                    } else {
+                        draw_list->AddText(ImVec2(text_start_x, text_draw_y),
+                                        ImColor(30, 30, 30), m_Lines[i].c_str());
+                    }
                 }
             }
+
+            ImGui::EndChild();
 
             ImGui::End();
         }

@@ -18,421 +18,407 @@
 #endif
 #ifdef _WIN32
 #include <windows.h>#endif
-
+#endif
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
 size_t GetByteOffset(const std::string &str, int char_index) {
-    size_t byte_offset = 0;
-    int count = 0;
-    for (size_t i = 0; i < str.size() && count < char_index;) {
-        unsigned char c = (unsigned char)str[i];
-        if (c < 0x80)
-            i += 1;
-        else if (c < 0xE0)
-            i += 2;
-        else if (c < 0xF0)
-            i += 3;
-        else
-            i += 4;
-        byte_offset = i;
-        count++;
-    }
-    return byte_offset;
+  size_t byte_offset = 0;
+  int count = 0;
+  for (size_t i = 0; i < str.size() && count < char_index;) {
+    unsigned char c = (unsigned char)str[i];
+    if (c < 0x80)
+      i += 1;
+    else if (c < 0xE0)
+      i += 2;
+    else if (c < 0xF0)
+      i += 3;
+    else
+      i += 4;
+    byte_offset = i;
+    count++;
+  }
+  return byte_offset;
 }
 
 int GetPreviousCharByteLength(const std::string &str, int char_index) {
-    if (char_index <= 0)
-        return 0;
+  if (char_index <= 0)
+    return 0;
 
-    size_t start_pos = GetByteOffset(str, char_index - 1);
+  size_t start_pos = GetByteOffset(str, char_index - 1);
 
-    unsigned char c = (unsigned char)str[start_pos];
+  unsigned char c = (unsigned char)str[start_pos];
 
-    if (c < 0x80)
-        return 1;    if (c < 0xE0)
-        return 2;    if (c < 0xF0)
-        return 3;    return 4;}
+  if (c < 0x80)
+    return 1;  if (c < 0xE0)
+    return 2;  if (c < 0xF0)
+    return 3;  return 4;}
 
 std::string GetLinuxSystemMonospaceFontPath() {
-    std::string font_path = "";
-    if (!FcInit())
-        return font_path;
-
-    FcConfig *fc_config = FcConfigGetCurrent();
-    FcPattern *pattern = FcPatternCreate();
-
-    FcPatternAddString(pattern, FC_FAMILY, (const FcChar8 *)"monospace");
-
-    FcConfigSubstitute(fc_config, pattern, FcMatchPattern);
-    FcDefaultSubstitute(pattern);
-
-    FcResult result;
-    FcPattern *match = FcFontMatch(fc_config, pattern, &result);
-
-    if (match) {
-        FcChar8 *file_path = nullptr;
-        if (FcPatternGetString(match, FC_FILE, 0, &file_path) ==
-            FcResultMatch) {
-            font_path = (const char *)file_path;
-        }
-        FcPatternDestroy(match);
-    }
-
-    FcPatternDestroy(pattern);
-
+  std::string font_path = "";
+  if (!FcInit())
     return font_path;
+
+  FcConfig *fc_config = FcConfigGetCurrent();
+  FcPattern *pattern = FcPatternCreate();
+
+  FcPatternAddString(pattern, FC_FAMILY, (const FcChar8 *)"monospace");
+
+  FcConfigSubstitute(fc_config, pattern, FcMatchPattern);
+  FcDefaultSubstitute(pattern);
+
+  FcResult result;
+  FcPattern *match = FcFontMatch(fc_config, pattern, &result);
+
+  if (match) {
+    FcChar8 *file_path = nullptr;
+    if (FcPatternGetString(match, FC_FILE, 0, &file_path) == FcResultMatch) {
+      font_path = (const char *)file_path;
+    }
+    FcPatternDestroy(match);
+  }
+
+  FcPatternDestroy(pattern);
+
+  return font_path;
 }
 
 void ConfigureLinuxNativeFont(ImFontConfig &config) {
-    config.PixelSnapH = true;
-    config.OversampleH = 3;
-    config.OversampleV = 1;
-    config.FontLoaderFlags = 0;
+  config.PixelSnapH = true;
+  config.OversampleH = 3;
+  config.OversampleV = 1;
+  config.FontLoaderFlags = 0;
 
-    if (!FcInit()) {
-        config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
-        return;
-    }
+  if (!FcInit()) {
+    config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+    return;
+  }
 
-    FcConfig *fc_config = FcConfigGetCurrent();
-    FcPattern *pattern = FcPatternCreate();
+  FcConfig *fc_config = FcConfigGetCurrent();
+  FcPattern *pattern = FcPatternCreate();
 
-    FcPatternAddString(pattern, FC_FAMILY, (const FcChar8 *)"Noto Sans CJK KR");
+  FcPatternAddString(pattern, FC_FAMILY, (const FcChar8 *)"Noto Sans CJK KR");
 
-    FcConfigSubstitute(fc_config, pattern, FcMatchPattern);
-    FcDefaultSubstitute(pattern);
+  FcConfigSubstitute(fc_config, pattern, FcMatchPattern);
+  FcDefaultSubstitute(pattern);
 
-    FcResult result;
-    FcPattern *match = FcFontMatch(fc_config, pattern, &result);
+  FcResult result;
+  FcPattern *match = FcFontMatch(fc_config, pattern, &result);
 
-    if (match) {
-        FcBool antialias = FcTrue;
-        int hinting = FcTrue;
-        int hint_style = FC_HINT_SLIGHT;
+  if (match) {
+    FcBool antialias = FcTrue;
+    int hinting = FcTrue;
+    int hint_style = FC_HINT_SLIGHT;
 
-        FcPatternGetBool(match, FC_ANTIALIAS, 0, &antialias);
-        FcPatternGetInteger(match, FC_HINTING, 0, &hinting);
-        FcPatternGetInteger(match, FC_HINT_STYLE, 0, &hint_style);
+    FcPatternGetBool(match, FC_ANTIALIAS, 0, &antialias);
+    FcPatternGetInteger(match, FC_HINTING, 0, &hinting);
+    FcPatternGetInteger(match, FC_HINT_STYLE, 0, &hint_style);
 
-        if (antialias == FcFalse) {
-            config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting |
-                                      ImGuiFreeTypeBuilderFlags_Monochrome;
-        } else {
-            if (hinting == FcFalse || hint_style == FC_HINT_NONE) {
-                config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_NoHinting;
-            } else if (hint_style == FC_HINT_SLIGHT ||
-                       hint_style == FC_HINT_MEDIUM) {
-                config.FontLoaderFlags |=
-                    ImGuiFreeTypeBuilderFlags_LightHinting;
-            } else if (hint_style == FC_HINT_FULL) {
-                config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting;
-            }
-        }
-
-        FcPatternDestroy(match);
+    if (antialias == FcFalse) {
+      config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting |
+                                ImGuiFreeTypeBuilderFlags_Monochrome;
     } else {
-        config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+      if (hinting == FcFalse || hint_style == FC_HINT_NONE) {
+        config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_NoHinting;
+      } else if (hint_style == FC_HINT_SLIGHT || hint_style == FC_HINT_MEDIUM) {
+        config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_LightHinting;
+      } else if (hint_style == FC_HINT_FULL) {
+        config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting;
+      }
     }
 
-    FcPatternDestroy(pattern);
+    FcPatternDestroy(match);
+  } else {
+    config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+  }
+
+  FcPatternDestroy(pattern);
 }
 
 int main(int, char **) {
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
-        printf("Error: SDL_Init(): %s\n", SDL_GetError());
-        return 1;
-    }
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    printf("Error: SDL_Init(): %s\n", SDL_GetError());
+    return 1;
+  }
 
 #if defined(IMGUI_IMPL_OPENGL_ES2)
-    const char *glsl_version = "#version 100";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  const char *glsl_version = "#version 100";
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #elif defined(IMGUI_IMPL_OPENGL_ES3)
-    const char *glsl_version = "#version 300 es";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  const char *glsl_version = "#version 300 es";
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #elif defined(__APPLE__)
-    const char *glsl_version = "#version 150";
-    SDL_GL_SetAttribute(
-        SDL_GL_CONTEXT_FLAGS,
-        SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
-                        SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+  const char *glsl_version = "#version 150";
+  SDL_GL_SetAttribute(
+      SDL_GL_CONTEXT_FLAGS,
+      SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
 #else
-    const char *glsl_version = "#version 130";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
-                        SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  const char *glsl_version = "#version 130";
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #endif
 
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-    SDL_WindowFlags window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-                                   SDL_WINDOW_HIDDEN |
-                                   SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    SDL_Window *window = SDL_CreateWindow(
-        "Dear ImGui SDL3+OpenGL3 example", (int)(1280 * main_scale),
-        (int)(800 * main_scale), window_flags);
-    if (window == nullptr) {
-        printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
-        return 1;
-    }
-    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-    if (gl_context == nullptr) {
-        printf("Error: SDL_GL_CreateContext(): %s\n", SDL_GetError());
-        return 1;
-    }
+  SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+  SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+  SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+  float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+  SDL_WindowFlags window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
+                                 SDL_WINDOW_HIDDEN |
+                                 SDL_WINDOW_HIGH_PIXEL_DENSITY;
+  SDL_Window *window = SDL_CreateWindow("Dear ImGui SDL3+OpenGL3 example",
+                                        (int)(1280 * main_scale),
+                                        (int)(800 * main_scale), window_flags);
+  if (window == nullptr) {
+    printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
+    return 1;
+  }
+  SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+  if (gl_context == nullptr) {
+    printf("Error: SDL_GL_CreateContext(): %s\n", SDL_GetError());
+    return 1;
+  }
 
-    SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1);    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED,
-                          SDL_WINDOWPOS_CENTERED);
-    SDL_ShowWindow(window);
+  SDL_GL_MakeCurrent(window, gl_context);
+  SDL_GL_SetSwapInterval(1);  SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+  SDL_ShowWindow(window);
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableKeyboard;    io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableGamepad;
-    ImGui::StyleColorsLight();
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO &io = ImGui::GetIO();
+  (void)io;
+  io.ConfigFlags |=
+      ImGuiConfigFlags_NavEnableKeyboard;  io.ConfigFlags |=
+      ImGuiConfigFlags_NavEnableGamepad;
+  ImGui::StyleColorsLight();
 
-    ImGuiStyle &style = ImGui::GetStyle();
-    style.ScaleAllSizes(
-        main_scale);    style.FontScaleDpi =
-        main_scale;
-    ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+  ImGuiStyle &style = ImGui::GetStyle();
+  style.ScaleAllSizes(
+      main_scale);  style.FontScaleDpi =
+      main_scale;
+  ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
+  ImGui_ImplOpenGL3_Init(glsl_version);
 
 
-    ImFontConfig config;
+  ImFontConfig config;
 
-    config.PixelSnapH = true;
-    config.OversampleH = 3;
-    config.OversampleV = 1;
-    config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+  config.PixelSnapH = true;
+  config.OversampleH = 3;
+  config.OversampleV = 1;
+  config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
 
-    float font_size = 23.0f;
+  float font_size = 23.0f;
 
-    ImFont *font = io.Fonts->AddFontFromFileTTF(
-        GetLinuxSystemMonospaceFontPath().c_str(), font_size, &config,
-        io.Fonts->GetGlyphRangesKorean());
+  ImFont *font = io.Fonts->AddFontFromFileTTF(
+      GetLinuxSystemMonospaceFontPath().c_str(), font_size, &config,
+      io.Fonts->GetGlyphRangesKorean());
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    static std::vector<std::string> m_Lines = {""};
-    static int m_CursorLine = 0;
-    static int m_CursorByteOffset = 0;
+  static std::vector<std::string> m_Lines = {""};
+  static int m_CursorLine = 0;
+  static int m_CursorByteOffset = 0;
 
-    static std::string m_CompositionText = "";
+  static std::string m_CompositionText = "";
 
-    SDL_StartTextInput(window);
+  SDL_StartTextInput(window);
 
-    bool done = false;
+  bool done = false;
 
-    while (!done) {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL3_ProcessEvent(&event);
-            if (event.type == SDL_EVENT_QUIT)
-                done = true;
-            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-                event.window.windowID == SDL_GetWindowID(window))
-                done = true;
+  while (!done) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      ImGui_ImplSDL3_ProcessEvent(&event);
+      if (event.type == SDL_EVENT_QUIT)
+        done = true;
+      if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
+          event.window.windowID == SDL_GetWindowID(window))
+        done = true;
 
-            if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
-                SDL_Delay(10);
-                continue;
+      if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
+        SDL_Delay(10);
+        continue;
+      }
+
+      if (event.type == SDL_EVENT_KEY_DOWN) {
+        if (event.key.key == SDLK_BACKSPACE) {
+          std::string &line = m_Lines[m_CursorLine];
+          if (m_CursorByteOffset > 0) {
+            int bytes_to_remove = 1;
+            int i = 1;
+            while (i <= 4 && (m_CursorByteOffset - i) >= 0) {
+              unsigned char c = (unsigned char)line[m_CursorByteOffset - i];
+              if ((c & 0xC0) != 0x80) {
+                bytes_to_remove = i;
+                break;
+              }
+              i++;
             }
 
-            if (event.type == SDL_EVENT_KEY_DOWN) {
-                if (event.key.key == SDLK_BACKSPACE) {
-                    std::string &line = m_Lines[m_CursorLine];
-                    if (m_CursorByteOffset > 0) {
-                        int bytes_to_remove = 1;
-                        int i = 1;
-                        while (i <= 4 && (m_CursorByteOffset - i) >= 0) {
-                            unsigned char c =
-                                (unsigned char)line[m_CursorByteOffset - i];
-                            if ((c & 0xC0) != 0x80) {
-                                bytes_to_remove = i;
-                                break;
-                            }
-                            i++;
-                        }
-
-                        line.erase(m_CursorByteOffset - bytes_to_remove,
-                                   bytes_to_remove);
-                        m_CursorByteOffset -= bytes_to_remove;
-                    } else if (m_CursorLine > 0) {
-                        m_CursorByteOffset = m_Lines[m_CursorLine - 1].size();
-                        m_Lines[m_CursorLine - 1] += m_Lines[m_CursorLine];
-                        m_Lines.erase(m_Lines.begin() + m_CursorLine);
-                        m_CursorLine--;
-                    }
-                }
-            }
-
-            if (event.type == SDL_EVENT_TEXT_EDITING) {
-                m_CompositionText = event.edit.text;
-                continue;
-            }
-
-            if (event.type == SDL_EVENT_TEXT_INPUT) {
-                m_CompositionText.clear();
-                std::string input_str = event.text.text;
-
-                m_Lines[m_CursorLine].insert(m_CursorByteOffset, input_str);
-
-                m_CursorByteOffset += (int)input_str.size();
-
-                if (m_CursorByteOffset > (int)m_Lines[m_CursorLine].size()) {
-                    m_CursorByteOffset = (int)m_Lines[m_CursorLine].size();
-                }
-            }
+            line.erase(m_CursorByteOffset - bytes_to_remove, bytes_to_remove);
+            m_CursorByteOffset -= bytes_to_remove;
+          } else if (m_CursorLine > 0) {
+            m_CursorByteOffset = m_Lines[m_CursorLine - 1].size();
+            m_Lines[m_CursorLine - 1] += m_Lines[m_CursorLine];
+            m_Lines.erase(m_Lines.begin() + m_CursorLine);
+            m_CursorLine--;
+          }
         }
+      }
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
+      if (event.type == SDL_EVENT_TEXT_EDITING) {
+        m_CompositionText = event.edit.text;
+        continue;
+      }
 
-        {
-            ImGuiWindowFlags window_flags =
-                ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoTitleBar |
-                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoSavedSettings |
-                ImGuiWindowFlags_NoBringToFrontOnFocus;
+      if (event.type == SDL_EVENT_TEXT_INPUT) {
+        m_CompositionText.clear();
+        std::string input_str = event.text.text;
 
-            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-            ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+        m_Lines[m_CursorLine].insert(m_CursorByteOffset, input_str);
 
-            static float f = 0.0f;
-            static int counter = 0;
+        m_CursorByteOffset += (int)input_str.size();
 
-            ImGui::Begin("Hello, world!", nullptr, window_flags);
+        if (m_CursorByteOffset > (int)m_Lines[m_CursorLine].size()) {
+          m_CursorByteOffset = (int)m_Lines[m_CursorLine].size();
+        }
+      }
+    }
 
-            ImDrawList *draw_list = ImGui::GetWindowDrawList();
-            ImVec2 start_pos = ImGui::GetCursorScreenPos();
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
 
-            ImFont *current_font = ImGui::GetFont();
-            float total_line_height =
-                ImGui::GetTextLineHeight() + 6.0f;            float char_width =
+    {
+      ImGuiWindowFlags window_flags =
+          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoTitleBar |
+          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+          ImGuiWindowFlags_NoSavedSettings |
+          ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+      ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+      ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+
+      static float f = 0.0f;
+      static int counter = 0;
+
+      ImGui::Begin("Hello, world!", nullptr, window_flags);
+
+      ImDrawList *draw_list = ImGui::GetWindowDrawList();
+      ImVec2 start_pos = ImGui::GetCursorScreenPos();
+
+      ImFont *current_font = ImGui::GetFont();
+      float total_line_height =
+          ImGui::GetTextLineHeight() + 6.0f;      float char_width =
+          current_font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, "A")
+              .x;
+
+      for (size_t i = 0; i < m_Lines.size(); i++) {
+        float box_top_y = start_pos.y + (i * total_line_height);
+        float text_draw_y = box_top_y + 3.0f;
+        char num_buf[16];
+        sprintf(num_buf, "%3zu", i + 1);
+        draw_list->AddText(ImVec2(start_pos.x + 10.0f, text_draw_y),
+                           ImColor(120, 120, 120), num_buf);
+
+        float text_start_x = start_pos.x + 60.0f;
+
+        if (i == (size_t)m_CursorLine) {
+
+          size_t safe_offset = m_CursorByteOffset;
+          if (safe_offset > m_Lines[i].size())
+            safe_offset = m_Lines[i].size();
+
+          std::string left_text = m_Lines[i].substr(0, safe_offset);
+          draw_list->AddText(ImVec2(text_start_x, text_draw_y),
+                             ImColor(30, 30, 30), left_text.c_str());
+
+          float left_width = current_font
+                                 ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX,
+                                                 -1.0f, left_text.c_str())
+                                 .x;
+          float current_x = text_start_x + left_width;
+
+          float cursor_x = text_start_x + left_width;
+          float cursor_y = box_top_y;
+
+          SDL_Rect area = {(int)cursor_x, (int)cursor_y, 1,
+                           (int)total_line_height};
+          SDL_SetTextInputArea(window, &area,
+                               0);
+          if (!m_CompositionText.empty()) {
+            draw_list->AddText(ImVec2(current_x, text_draw_y),
+                               ImColor(100, 100, 100),
+                               m_CompositionText.c_str());
+
+            float comp_width =
                 current_font
-                    ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, "A")
+                    ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f,
+                                    m_CompositionText.c_str())
                     .x;
 
-            for (size_t i = 0; i < m_Lines.size(); i++) {
-                float box_top_y = start_pos.y + (i * total_line_height);
-                float text_draw_y =
-                    box_top_y + 3.0f;
-                char num_buf[16];
-                sprintf(num_buf, "%3zu", i + 1);
-                draw_list->AddText(ImVec2(start_pos.x + 10.0f, text_draw_y),
-                                   ImColor(120, 120, 120), num_buf);
+            draw_list->AddLine(
+                ImVec2(current_x, box_top_y + total_line_height - 2.0f),
+                ImVec2(current_x + comp_width,
+                       box_top_y + total_line_height - 2.0f),
+                ImColor(100, 100, 100), 1.5f);
 
-                float text_start_x = start_pos.x + 60.0f;
-
-                if (i == (size_t)m_CursorLine) {
-
-                    size_t safe_offset = m_CursorByteOffset;
-                    if (safe_offset > m_Lines[i].size())
-                        safe_offset = m_Lines[i].size();
-
-                    std::string left_text = m_Lines[i].substr(0, safe_offset);
-                    draw_list->AddText(ImVec2(text_start_x, text_draw_y),
-                                       ImColor(30, 30, 30), left_text.c_str());
-
-                    float left_width =
-                        current_font
-                            ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX,
-                                            -1.0f, left_text.c_str())
-                            .x;
-                    float current_x = text_start_x + left_width;
-
-                    float cursor_x = text_start_x + left_width;
-                    float cursor_y = box_top_y;
-
-                    SDL_Rect area = {(int)cursor_x, (int)cursor_y, 1,
-                                     (int)total_line_height};
-                    SDL_SetTextInputArea(window, &area,
-                                         0);
-                    if (!m_CompositionText.empty()) {
-                        draw_list->AddText(ImVec2(current_x, text_draw_y),
-                                           ImColor(100, 100, 100),
-                                           m_CompositionText.c_str());
-
-                        float comp_width =
-                            current_font
-                                ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX,
-                                                -1.0f,
-                                                m_CompositionText.c_str())
-                                .x;
-
-                        draw_list->AddLine(
-                            ImVec2(current_x,
-                                   box_top_y + total_line_height - 2.0f),
-                            ImVec2(current_x + comp_width,
-                                   box_top_y + total_line_height - 2.0f),
-                            ImColor(100, 100, 100), 1.5f);
-
-                        current_x += comp_width;                    } else {
-                        if (fmod(ImGui::GetTime(), 1.0f) < 0.5f) {
-                            draw_list->AddRectFilled(
-                                ImVec2(current_x, box_top_y + 2.0f),
-                                ImVec2(current_x + 2.0f,
-                                       box_top_y + total_line_height - 2.0f),
-                                ImColor(0, 0, 0));
-                        }
-                    }
-
-                    std::string right_text = m_Lines[i].substr(safe_offset);
-                    draw_list->AddText(ImVec2(current_x, text_draw_y),
-                                       ImColor(30, 30, 30), right_text.c_str());
-                } else {
-                    draw_list->AddText(ImVec2(text_start_x, text_draw_y),
-                                       ImColor(30, 30, 30), m_Lines[i].c_str());
-                }
+            current_x += comp_width;          } else {
+            if (fmod(ImGui::GetTime(), 1.0f) < 0.5f) {
+              draw_list->AddRectFilled(
+                  ImVec2(current_x, box_top_y + 2.0f),
+                  ImVec2(current_x + 2.0f,
+                         box_top_y + total_line_height - 2.0f),
+                  ImColor(0, 0, 0));
             }
+          }
 
-            ImGui::End();
+          std::string right_text = m_Lines[i].substr(safe_offset);
+          draw_list->AddText(ImVec2(current_x, text_draw_y),
+                             ImColor(30, 30, 30), right_text.c_str());
+        } else {
+          draw_list->AddText(ImVec2(text_start_x, text_draw_y),
+                             ImColor(30, 30, 30), m_Lines[i].c_str());
         }
+      }
 
-        ImGui::Render();
-
-        int display_w, display_h;
-        SDL_GetWindowSizeInPixels(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-
-        glClearColor(clear_color.x * clear_color.w,
-                     clear_color.y * clear_color.w,
-                     clear_color.z * clear_color.w, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
+      ImGui::End();
     }
+
+    ImGui::Render();
+
+    int display_w, display_h;
+    SDL_GetWindowSizeInPixels(window, &display_w, &display_h);
+    glViewport(0, 0, display_w, display_h);
+
+    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w,
+                 clear_color.z * clear_color.w, clear_color.w);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    SDL_GL_SwapWindow(window);
+  }
 #ifdef __EMSCRIPTEN__
-    EMSCRIPTEN_MAINLOOP_END;
+  EMSCRIPTEN_MAINLOOP_END;
 #endif
 
-    FcFini();
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
+  FcFini();
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplSDL3_Shutdown();
+  ImGui::DestroyContext();
 
-    SDL_GL_DestroyContext(gl_context);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+  SDL_GL_DestroyContext(gl_context);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
 
-    return 0;
+  return 0;
 }

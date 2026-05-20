@@ -27,6 +27,14 @@
 #include <SDL3/SDL_opengl.h>
 #endif
 
+#define TITLE_PREFIX "file.txt - LeafEdit "
+#define VERSION "a0.1"
+
+void UpdateWindowTitle(SDL_Window* window, const std::string& filename, bool is_dirty) {
+    std::string title = (is_dirty ? "*" : "") + filename + " - LeafEdit " VERSION;
+    SDL_SetWindowTitle(window, title.c_str());
+}
+
 size_t GetByteOffset(const std::string &str, int char_index) {
     size_t byte_offset = 0;
     int count = 0;
@@ -190,7 +198,7 @@ int main(int, char **) {
                                    SDL_WINDOW_HIDDEN |
                                    SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window *window = SDL_CreateWindow(
-        "LeafEdit a0.1", (int)(1280 * main_scale),
+        TITLE_PREFIX VERSION, (int)(1280 * main_scale),
         (int)(800 * main_scale), window_flags);
     if (window == nullptr) {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -240,6 +248,7 @@ int main(int, char **) {
     static std::vector<std::string> m_Lines = {""};
     static int m_CursorLine = 0;
     static int m_CursorByteOffset = 0;
+    static bool m_IsDirty = false;
 
     static std::string m_CompositionText = "";
 
@@ -309,7 +318,12 @@ int main(int, char **) {
                         }
                     }
 
+                    SDL_SetWindowTitle(window, TITLE_PREFIX VERSION);
+
                     s_file.close();
+
+                    m_IsDirty = false; 
+                    UpdateWindowTitle(window, "file.txt", m_IsDirty);
                 }
             }
 
@@ -319,6 +333,11 @@ int main(int, char **) {
             }
 
             if (event.type == SDL_EVENT_TEXT_INPUT) {
+                if (!m_IsDirty) {
+                    m_IsDirty = true;
+                    UpdateWindowTitle(window, "file.txt", m_IsDirty);
+                }
+                
                 m_CompositionText.clear();
                 std::string input_str = event.text.text;
 

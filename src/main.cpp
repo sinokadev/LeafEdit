@@ -1,4 +1,4 @@
-// Dear ImGui: standalone example application for SDL2 + OpenGL
+// Dear ImGui: standalone example application for SDL3 + OpenGL
 // (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation, etc.)
 
 // Learn about Dear ImGui:
@@ -8,19 +8,20 @@
 // - Introduction, links and more at the top of imgui.cpp
 
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_freetype.h"
 #include <stdio.h>
 #include <fontconfig/fontconfig.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <vector>
 #include <string>
 #include <iostream>
+#include <cmath>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <SDL2/SDL_opengles2.h>
+#include <SDL3/SDL_opengles2.h>
 #else
-#include <SDL2/SDL_opengl.h>
+#include <SDL3/SDL_opengl.h>
 #endif
 #ifdef _WIN32
 #include <windows.h>        // SetProcessDPIAware()
@@ -117,16 +118,13 @@ void ConfigureLinuxNativeFont(ImFontConfig& config) {
     FcPatternDestroy(pattern);
 }
 
-// Main code
 int main(int, char**)
 {
     // Setup SDL
-#ifdef _WIN32
-    ::SetProcessDPIAware();
-#endif
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
+    // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
     {
-        printf("Error: %s\n", SDL_GetError());
+        printf("Error: SDL_Init(): %s\n", SDL_GetError());
         return 1;
     }
 
@@ -161,24 +159,18 @@ int main(int, char**)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #endif
 
-    // From 2.0.18: Enable native IME.
-#ifdef SDL_HINT_IME_SHOW_UI
-    SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
-#endif
-
     // Create window with graphics context
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    float main_scale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
+    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+    SDL_WindowFlags window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL3+OpenGL3 example", (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
         return 1;
     }
-
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     if (gl_context == nullptr)
     {
@@ -188,6 +180,8 @@ int main(int, char**)
 
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1); // Enable vsync
+    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    SDL_ShowWindow(window);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -206,7 +200,7 @@ int main(int, char**)
     style.FontScaleDpi = main_scale;        // Set initial font scale. (in docking branch: using io.ConfigDpiScaleFonts=true automatically overrides this for every window depending on the current monitor)
 
     // Setup Platform/Renderer backends
-    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+    ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
@@ -253,7 +247,7 @@ int main(int, char**)
 
     static std::string m_CompositionText = "";
 
-        SDL_StartTextInput();
+    SDL_StartTextInput(window);
 
     // Main loop
     bool done = false;
@@ -268,26 +262,26 @@ int main(int, char**)
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT)
+            ImGui_ImplSDL3_ProcessEvent(&event);
+            if (event.type == SDL_EVENT_QUIT)
                 done = true;
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
                 done = true;
+            
             if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
             {
                 SDL_Delay(10);
                 continue;
             }
-            
 // 2. 글자 조립 중 (Composition)
-    if (event.type == SDL_TEXTEDITING)
+    if (event.type == SDL_EVENT_TEXT_EDITING)
     {
         m_CompositionText = event.edit.text;
         continue; 
     }
 
     // 3. 글자 완성 및 일반 문자/스페이스 입력 (Commit)
-    if (event.type == SDL_TEXTINPUT)
+    if (event.type == SDL_EVENT_TEXT_INPUT)
     {
         // 글자가 완성되었으므로 조립 버퍼는 비웁니다.
         m_CompositionText.clear();
@@ -318,7 +312,7 @@ int main(int, char**)
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
         {
@@ -337,12 +331,16 @@ int main(int, char**)
 
             ImGui::Begin("Hello, world!", nullptr, window_flags);
 
+
+
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
             ImVec2 start_pos = ImGui::GetCursorScreenPos();
 
             ImFont* current_font = ImGui::GetFont();
             float total_line_height = ImGui::GetTextLineHeight() + 6.0f; // 줄높이 + 행간 마진
             float char_width = current_font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, "A").x;
+
+
 
             for (size_t i = 0; i < m_Lines.size(); i++){
                 float box_top_y = start_pos.y + (i * total_line_height);
@@ -366,6 +364,13 @@ int main(int, char**)
                     // 앞쪽 텍스트의 가로 길이를 계산합니다. (ImGui 함수 활용)
                     float left_width = current_font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, left_text.c_str()).x;
                     float current_x = text_start_x + left_width;
+
+                    float cursor_x = text_start_x + left_width; 
+                    float cursor_y = box_top_y;
+
+                    // SDL3에게 "내 에디터의 커서 위치는 여기야!"라고 알림
+                    SDL_Rect area = { (int)cursor_x, (int)cursor_y, 1, (int)total_line_height };
+                    SDL_SetTextInputArea(window, &area, 0); // 0은 커서 위치 오프셋입니다.
 
                     // 2단계: OS가 조합 중인 한글이 있다면 중간에 끼워 넣어서 그리기
                     if (!m_CompositionText.empty()) {
@@ -413,7 +418,7 @@ int main(int, char**)
         ImGui::Render();
 
         int display_w, display_h;
-        SDL_GL_GetDrawableSize(window, &display_w, &display_h);
+        SDL_GetWindowSizeInPixels(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
 
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
@@ -428,10 +433,10 @@ int main(int, char**)
     // Cleanup
     FcFini();
     ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 
-    SDL_GL_DeleteContext(gl_context);
+    SDL_GL_DestroyContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
 

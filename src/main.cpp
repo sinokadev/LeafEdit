@@ -13,8 +13,10 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
+#include "imgui_freetype.h"
 #include <stdio.h>
-#include <SDL.h>
+#include <fontconfig/fontconfig.h>
+#include <SDL2/SDL.h>
 #ifdef _WIN32
 #include <windows.h>        // SetProcessDPIAware()
 #endif
@@ -22,6 +24,54 @@
 #if !SDL_VERSION_ATLEAST(2,0,17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
+
+
+void ConfigureLinuxNativeFont(ImFontConfig& config) {
+    config.PixelSnapH = true;
+    config.FontLoaderFlags = 0;
+
+    if (!FcInit()) {
+        config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+        return;
+    }
+
+    FcConfig* fc_config = FcConfigGetCurrent();
+    FcPattern* pattern = FcPatternCreate();
+    
+    FcConfigSubstitute(fc_config, pattern, FcMatchPattern);
+    FcDefaultSubstitute(pattern);
+    
+    FcResult result;
+    FcPattern* match = FcFontMatch(fc_config, pattern, &result);
+    
+    if (match) {
+        FcBool antialias = FcTrue;
+        int hinting = FcTrue;
+        int hint_style = FC_HINT_SLIGHT;
+
+        FcPatternGetBool(match, FC_ANTIALIAS, 0, &antialias);
+        FcPatternGetInteger(match, FC_HINTING, 0, &hinting);
+        FcPatternGetInteger(match, FC_HINT_STYLE, 0, &hint_style);
+
+        if (antialias == FcFalse) {
+            config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting | ImGuiFreeTypeBuilderFlags_Monochrome;
+        } else {
+            if (hinting == FcFalse || hint_style == FC_HINT_NONE) {
+                config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_NoHinting;
+            } else if (hint_style == FC_HINT_SLIGHT) {
+                config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_LightHinting;
+            } else if (hint_style == FC_HINT_MEDIUM || hint_style == FC_HINT_FULL) {
+                config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting;
+            }
+        }
+
+        FcPatternDestroy(match);
+    } else {
+        config.FontLoaderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+    }
+    
+    FcPatternDestroy(pattern);
+}
 
 // Main code
 int main(int, char**)
@@ -44,7 +94,7 @@ int main(int, char**)
     // Create window with SDL_Renderer graphics context
     float main_scale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+SDL_Renderer example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
+    SDL_Window* window = SDL_CreateWindow("LeafEdit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -68,8 +118,7 @@ int main(int, char**)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
+    ImGui::StyleColorsLight();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
@@ -98,9 +147,21 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf");
     //IM_ASSERT(font != nullptr);
 
+    ImFontConfig config;
+    
+    ConfigureLinuxNativeFont(config);
+    config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_Bold;
+
+    float font_size = 20.0f; 
+
+    ImFont* font = io.Fonts->AddFontFromFileTTF(
+        "NotoSansKR.ttf",
+        font_size,
+        &config, 
+        io.Fonts->GetGlyphRangesKorean()
+    );
+
     // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
@@ -132,40 +193,27 @@ int main(int, char**)
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         {
+            ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | 
+                                            ImGuiWindowFlags_NoTitleBar |
+                                            ImGuiWindowFlags_NoMove | 
+                                            ImGuiWindowFlags_NoResize | 
+                                            ImGuiWindowFlags_NoSavedSettings |
+                                            ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("Hello, world!", nullptr, window_flags);                          // Create a window called "Hello, world!" and append into it.
 
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
+            ImGui::PushFont(font);
+            ImGui::Text("가나다라 안녕하세요");
+            ImGui::PopFont();
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
             ImGui::End();
         }
 

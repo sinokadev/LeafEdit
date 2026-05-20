@@ -17,6 +17,9 @@ if(NOT imgui_POPULATED)
 endif()
 
 find_package(SDL2 REQUIRED)
+find_package(Freetype REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 
 add_library(imgui_sdl2 STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
@@ -27,13 +30,17 @@ add_library(imgui_sdl2 STATIC
 
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer2.cpp
+  
+  ${imgui_SOURCE_DIR}/misc/freetype/imgui_freetype.cpp 
 )
 
-target_link_libraries(imgui_sdl2 PUBLIC SDL2::SDL2)
+target_compile_definitions(imgui_sdl2 PUBLIC IMGUI_ENABLE_FREETYPE)
+target_link_libraries(imgui_sdl2 PUBLIC SDL2::SDL2 Freetype::Freetype)
 
 target_include_directories(imgui_sdl2 PUBLIC
   ${imgui_SOURCE_DIR}
   ${imgui_SOURCE_DIR}/backends
+  ${imgui_SOURCE_DIR}/misc/freetype
 )
 
 add_executable(leafedit src/main.cpp)
@@ -41,4 +48,5 @@ add_executable(leafedit src/main.cpp)
 target_link_libraries(leafedit PRIVATE 
     imgui_sdl2
     SDL2::SDL2
+    ${FONTCONFIG_LIBRARIES}
 )

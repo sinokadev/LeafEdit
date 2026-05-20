@@ -1,3 +1,11 @@
+// ## License / Credits
+// 
+// - Original Dear ImGui SDL3+OpenGL3 Example code 
+//   Copyright (c) 2014-2026 Omar Cornut (Dear ImGui)
+// 
+// - LeafEdit
+//   Copyright (c) 2026 sinokadev
+
 #include <SDL3/SDL.h>
 #include <fontconfig/fontconfig.h>
 #include <stdio.h>
@@ -186,7 +194,7 @@ int main(int, char **) {
                                    SDL_WINDOW_HIDDEN |
                                    SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window *window = SDL_CreateWindow(
-        "Dear ImGui SDL3+OpenGL3 example", (int)(1280 * main_scale),
+        "LeafEdit a0.1", (int)(1280 * main_scale),
         (int)(800 * main_scale), window_flags);
     if (window == nullptr) {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -276,6 +284,20 @@ int main(int, char **) {
                         m_Lines.erase(m_Lines.begin() + m_CursorLine);
                         m_CursorLine--;
                     }
+                }
+
+                if (event.key.key == SDLK_RETURN) {
+                    std::string &current_line = m_Lines[m_CursorLine];
+
+                    std::string next_line_text = current_line.substr(m_CursorByteOffset);
+
+                    current_line = current_line.substr(0, m_CursorByteOffset);
+
+                    m_Lines.insert(m_Lines.begin() + m_CursorLine + 1, next_line_text);
+
+                    m_CursorLine++;
+
+                    m_CursorByteOffset = 0;
                 }
             }
 

@@ -28,6 +28,8 @@
 
 void ConfigureLinuxNativeFont(ImFontConfig& config) {
     config.PixelSnapH = true;
+    config.OversampleH = 3;
+    config.OversampleV = 1;
     config.FontLoaderFlags = 0;
 
     if (!FcInit()) {
@@ -37,6 +39,8 @@ void ConfigureLinuxNativeFont(ImFontConfig& config) {
 
     FcConfig* fc_config = FcConfigGetCurrent();
     FcPattern* pattern = FcPatternCreate();
+
+    FcPatternAddString(pattern, FC_FAMILY, (const FcChar8*)"Noto Sans CJK KR");
     
     FcConfigSubstitute(fc_config, pattern, FcMatchPattern);
     FcDefaultSubstitute(pattern);
@@ -56,11 +60,13 @@ void ConfigureLinuxNativeFont(ImFontConfig& config) {
         if (antialias == FcFalse) {
             config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting | ImGuiFreeTypeBuilderFlags_Monochrome;
         } else {
+// [수정] 웹 브라우저 느낌을 내기 위해 힌팅 강도를 한 단계씩 낮추어 매핑합니다.
             if (hinting == FcFalse || hint_style == FC_HINT_NONE) {
                 config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_NoHinting;
-            } else if (hint_style == FC_HINT_SLIGHT) {
+            } else if (hint_style == FC_HINT_SLIGHT || hint_style == FC_HINT_MEDIUM) {
+                // Medium 힌팅까지는 브라우저처럼 부드러운 LightHinting으로 처리하는 것이 정신건강에 좋습니다.
                 config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_LightHinting;
-            } else if (hint_style == FC_HINT_MEDIUM || hint_style == FC_HINT_FULL) {
+            } else if (hint_style == FC_HINT_FULL) {
                 config.FontLoaderFlags |= ImGuiFreeTypeBuilderFlags_MonoHinting;
             }
         }
@@ -213,6 +219,11 @@ int main(int, char**)
             ImGui::PushFont(font);
             ImGui::Text("가나다라 안녕하세요");
             ImGui::PopFont();
+
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            ImVec2 my_pos = ImVec2(5, 100);
+
+            draw_list->AddText(my_pos, ImColor(0, 0, 0), "가나다라 안녕하세요");
 
             ImGui::End();
         }

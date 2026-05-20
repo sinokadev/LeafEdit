@@ -378,7 +378,7 @@ int main(int, char **) {
 
             ImVec2 nav_bar_size = ImGui::GetContentRegionAvail();
 
-            if (ImGui::BeginChild("Editor", nav_bar_size, ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar)) {
+            if (ImGui::BeginChild("Editor", nav_bar_size, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar)) {
                 ImDrawList *draw_list = ImGui::GetWindowDrawList();
                 ImVec2 start_pos = ImGui::GetCursorScreenPos();
 

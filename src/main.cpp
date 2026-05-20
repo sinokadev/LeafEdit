@@ -32,6 +32,37 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
+size_t GetByteOffset(const std::string& str, int char_index) {
+    size_t byte_offset = 0;
+    int count = 0;
+    for (size_t i = 0; i < str.size() && count < char_index; ) {
+        unsigned char c = (unsigned char)str[i];
+        // UTF-8 멀티바이트 문자 처리
+        if (c < 0x80) i += 1;
+        else if (c < 0xE0) i += 2;
+        else if (c < 0xF0) i += 3;
+        else i += 4;
+        byte_offset = i;
+        count++;
+    }
+    return byte_offset;
+}
+
+int GetPreviousCharByteLength(const std::string& str, int char_index) {
+    if (char_index <= 0) return 0;
+
+    // 이전 글자까지의 바이트 오프셋(시작점)
+    size_t start_pos = GetByteOffset(str, char_index - 1);
+    
+    // 현재 글자의 바이트를 확인
+    unsigned char c = (unsigned char)str[start_pos];
+    
+    if (c < 0x80) return 1;      // ASCII (1바이트)
+    if (c < 0xE0) return 2;      // 2바이트
+    if (c < 0xF0) return 3;      // 한글 포함 (3바이트)
+    return 4;                   // 4바이트
+}
+
 std::string GetLinuxSystemMonospaceFontPath() {
     std::string font_path = ""; // 실패 시 빈 문자열
 
@@ -241,9 +272,9 @@ int main(int, char**)
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    static std::vector<std::string> m_Lines = { "안녕하세요" };
+    static std::vector<std::string> m_Lines = { "" };
     static int m_CursorLine = 0;
-    static int m_CursorByteOffset = 15;
+    static int m_CursorByteOffset = 0;
 
     static std::string m_CompositionText = "";
 
@@ -273,6 +304,40 @@ int main(int, char**)
                 SDL_Delay(10);
                 continue;
             }
+
+            if (event.type == SDL_EVENT_KEY_DOWN) {
+                if (event.key.key == SDLK_BACKSPACE) {
+                    std::string& line = m_Lines[m_CursorLine];
+                    if (m_CursorByteOffset > 0) {
+// [핵심] 현재 위치 바로 앞의 글자 바이트 길이를 역방향으로 탐색
+        int bytes_to_remove = 1; // 기본값
+        
+        // 뒤에서부터 1~4바이트를 조사하여 UTF-8 시작 바이트(10xxxxxx가 아닌 것)를 찾음
+        int i = 1;
+        while (i <= 4 && (m_CursorByteOffset - i) >= 0) {
+            unsigned char c = (unsigned char)line[m_CursorByteOffset - i];
+            // UTF-8 시작 바이트 패턴 (0xxxxxxx 또는 11xxxxxx)
+            if ((c & 0xC0) != 0x80) {
+                bytes_to_remove = i;
+                break;
+            }
+            i++;
+        }
+
+        // 안전하게 삭제
+        line.erase(m_CursorByteOffset - bytes_to_remove, bytes_to_remove);
+        m_CursorByteOffset -= bytes_to_remove;
+                    } 
+                    else if (m_CursorLine > 0) {
+                        // [심화] 커서가 줄 맨 앞일 경우, 윗줄과 합치는 로직 (필요시)
+                        m_CursorByteOffset = m_Lines[m_CursorLine - 1].size();
+                        m_Lines[m_CursorLine - 1] += m_Lines[m_CursorLine];
+                        m_Lines.erase(m_Lines.begin() + m_CursorLine);
+                        m_CursorLine--;
+                    }
+                }
+            }
+
 // 2. 글자 조립 중 (Composition)
     if (event.type == SDL_EVENT_TEXT_EDITING)
     {
@@ -281,29 +346,20 @@ int main(int, char**)
     }
 
     // 3. 글자 완성 및 일반 문자/스페이스 입력 (Commit)
-    if (event.type == SDL_EVENT_TEXT_INPUT)
-    {
-        // 글자가 완성되었으므로 조립 버퍼는 비웁니다.
+    if (event.type == SDL_EVENT_TEXT_INPUT) {
         m_CompositionText.clear();
-
         std::string input_str = event.text.text;
 
-        std::cout << input_str << std::endl;
-
-        // [안전 장치] 커서 오프셋이 현재 줄의 길이를 초과했다면 맨 뒤로 강제 고정
-        if (m_CursorByteOffset < 0) m_CursorByteOffset = 0;
+        // 삽입
+        m_Lines[m_CursorLine].insert(m_CursorByteOffset, input_str);
+        
+        // 삽입 후 커서 전진
+        m_CursorByteOffset += (int)input_str.size();
+        
+        // 오버플로우 방지
         if (m_CursorByteOffset > (int)m_Lines[m_CursorLine].size()) {
             m_CursorByteOffset = (int)m_Lines[m_CursorLine].size();
         }
-
-        // 현재 정확한 커서 위치에 입력된 문자(한글이든 공백이든)를 삽입
-        m_Lines[m_CursorLine].insert(m_CursorByteOffset, input_str);
-
-        // [핵심] 삽입한 바이트 크기만큼 커서를 '즉시' 전진시킵니다.
-        // 다음 루프에서 공백(" ") 처리가 들어올 때 이 전진된 커서 뒤에 붙게 됩니다.
-        m_CursorByteOffset += input_str.size();
-        
-        continue;
     }
 
 
@@ -358,7 +414,12 @@ int main(int, char**)
                     // [중요] 현재 커서가 있는 줄은 세 단계로 쪼개어 그립니다.
                     
                     // 1단계: 커서 앞쪽 텍스트 그리기
-                    std::string left_text = m_Lines[i].substr(0, m_CursorByteOffset);
+                    size_t safe_offset = m_CursorByteOffset;
+                    // 간단한 보정: 3바이트 한글의 중간을 가리키고 있다면 앞/뒤로 강제 이동
+                    // (물론 문자 단위로 인덱스를 관리하는 것이 최선입니다)
+                    if (safe_offset > m_Lines[i].size()) safe_offset = m_Lines[i].size();
+
+                    std::string left_text = m_Lines[i].substr(0, safe_offset);
                     draw_list->AddText(ImVec2(text_start_x, text_draw_y), ImColor(30, 30, 30), left_text.c_str());
 
                     // 앞쪽 텍스트의 가로 길이를 계산합니다. (ImGui 함수 활용)
@@ -401,7 +462,7 @@ int main(int, char**)
                     }
 
                     // 3단계: 커서 뒤쪽 나머지 텍스트 그리기
-                    std::string right_text = m_Lines[i].substr(m_CursorByteOffset);
+                    std::string right_text = m_Lines[i].substr(safe_offset);
                     draw_list->AddText(ImVec2(current_x, text_draw_y), ImColor(30, 30, 30), right_text.c_str());
                 }
                 else

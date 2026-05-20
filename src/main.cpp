@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -19,16 +20,11 @@
 #include "imgui_freetype.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
+
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <SDL3/SDL_opengles2.h>
 #else
 #include <SDL3/SDL_opengl.h>
-#endif
-#ifdef _WIN32
-#include <windows.h>
-#endif
-#ifdef __EMSCRIPTEN__
-#include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
 size_t GetByteOffset(const std::string &str, int char_index) {
@@ -299,6 +295,22 @@ int main(int, char **) {
 
                     m_CursorByteOffset = 0;
                 }
+
+                if ((SDL_GetModState() & SDLK_LCTRL) && event.key.key == SDLK_S) {
+                    std::ofstream s_file;
+
+                    s_file.open("file.txt");
+                    if (s_file.is_open()) {
+                        for (size_t i = 0; i < m_Lines.size(); ++i) {
+                            if (i > 0) {
+                                s_file << "\n";
+                            }
+                            s_file << m_Lines[i];
+                        }
+                    }
+
+                    s_file.close();
+                }
             }
 
             if (event.type == SDL_EVENT_TEXT_EDITING) {
@@ -437,9 +449,6 @@ int main(int, char **) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
-#ifdef __EMSCRIPTEN__
-    EMSCRIPTEN_MAINLOOP_END;
-#endif
 
     FcFini();
     ImGui_ImplOpenGL3_Shutdown();

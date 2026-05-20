@@ -1,4 +1,4 @@
-default: build run
+default: run
 
 setup:
     cmake -S . -B build
@@ -9,7 +9,7 @@ debug:
 build:
     cmake --build build
 
-run:
+run: build
     ./build/leafedit
 
 exec:

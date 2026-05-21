@@ -471,13 +471,14 @@ int main(int, char **) {
                             float cursor_x = text_start_x + left_width;
                             float cursor_y = box_top_y;
 
+                            // 입력중인 글자 그리기
                             SDL_Rect area = {(int)cursor_x, (int)cursor_y, 1,
                                              (int)total_line_height};
                             SDL_SetTextInputArea(window, &area, 0);
                             if (!m_CompositionText.empty()) {
                                 draw_list->AddText(
                                     ImVec2(current_x, text_draw_y),
-                                    ImColor(100, 100, 100),
+                                    ImColor(0, 0, 0),
                                     m_CompositionText.c_str());
 
                                 float comp_width =

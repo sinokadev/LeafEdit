@@ -54,21 +54,19 @@ size_t GetByteOffset(const std::string &str, int char_index) {
     return byte_offset;
 }
 
-int GetPreviousCharByteLength(const std::string &str, int char_index) {
-    if (char_index <= 0)
-        return 0;
+int GetPreviousCharByteLength(const std::string &str, int byte_offset) {
+    if (byte_offset <= 0) return 0;
 
-    size_t start_pos = GetByteOffset(str, char_index - 1);
+    int len = 1;
+    while (len <= 4 && byte_offset - len >= 0) {
+        unsigned char c = (unsigned char)str[byte_offset - len];
 
-    unsigned char c = (unsigned char)str[start_pos];
-
-    if (c < 0x80)
-        return 1;
-    if (c < 0xE0)
-        return 2;
-    if (c < 0xF0)
-        return 3;
-    return 4;
+        if ((c & 0xC0) != 0x80) {
+            return len;
+        }
+        len++;
+    }
+    return 1;
 }
 
 std::string GetLinuxSystemMonospaceFontPath() {
@@ -410,12 +408,13 @@ int main(int, char **) {
                     float cursor_x = text_start_x + left_width;
                     float cursor_y = box_top_y;
 
+                    // 입력중인 글자 그리기
                     SDL_Rect area = {(int)cursor_x, (int)cursor_y, 1,
                                      (int)total_line_height};
                     SDL_SetTextInputArea(window, &area, 0);
                     if (!m_CompositionText.empty()) {
                         draw_list->AddText(ImVec2(current_x, text_draw_y),
-                                           ImColor(100, 100, 100),
+                                           ImColor(0, 0, 0),
                                            m_CompositionText.c_str());
 
                         float comp_width =

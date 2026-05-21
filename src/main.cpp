@@ -105,28 +105,26 @@ void UpdateWindowTitle(SDL_Window *window, const std::string &filename,
     SDL_SetWindowTitle(window, title.c_str());
 }
 
-size_t GetByteOffset(const std::string &str, int char_index) {
-    size_t byte_offset = 0;
-    int count = 0;
-    for (size_t i = 0; i < str.size() && count < char_index;) {
-        unsigned char c = (unsigned char)str[i];
-        if (c < 0x80)
-            i += 1;
-        else if (c < 0xE0)
-            i += 2;
-        else if (c < 0xF0)
-            i += 3;
-        else
-            i += 4;
-        byte_offset = i;
-        count++;
+int GetNextCharByteLength(const std::string &str, int byte_offset) {
+    if (byte_offset < 0 || byte_offset >= static_cast<int>(str.length())) {
+        return 0;
     }
-    return byte_offset;
+
+    unsigned char c = static_cast<unsigned char>(str[byte_offset]);
+
+    if (c < 0x80) return 1;
+
+    if ((c & 0xE0) == 0xC0) return 2;
+
+    if ((c & 0xF0) == 0xE0) return 3;
+    
+    if ((c & 0xF8) == 0xF0) return 4;
+
+    return 1;
 }
 
 int GetPreviousCharByteLength(const std::string &str, int byte_offset) {
-    if (byte_offset <= 0) return 0;
-
+    if (byte_offset <= 0 || byte_offset > (int)str.length()) return 0;
     int len = 1;
     while (len <= 4 && byte_offset - len >= 0) {
         unsigned char c = (unsigned char)str[byte_offset - len];
@@ -230,6 +228,8 @@ std::string GetFileNameFromPath(std::string filepath) {
     return filename;
 }
 
+
+
 int main(int, char **) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         printf("Error: SDL_Init(): %s\n", SDL_GetError());
@@ -326,6 +326,9 @@ int main(int, char **) {
     static bool m_IsDirty = false;
     static bool m_CursorChanged = false;
     static std::string m_FilePath = "";
+    static bool m_ShowLineAlways = false;
+    static Uint64 m_LastInteractionTime = 0; // 마지막 상호작용 시간 저장
+    const Uint64 SHOW_DURATION_MS = 200;    // 2초 동안 표시
 
     static std::string m_CompositionText = "";
 
@@ -334,6 +337,8 @@ int main(int, char **) {
     bool done = false;
 
     while (!done) {
+
+        // 이벤트
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL3_ProcessEvent(&event);
@@ -348,6 +353,7 @@ int main(int, char **) {
                 continue;
             }
 
+            // 키입력
             if (event.type == SDL_EVENT_KEY_DOWN) {
                 if (event.key.key == SDLK_BACKSPACE) {
                     std::string &line = m_Lines[m_CursorLine];
@@ -367,6 +373,9 @@ int main(int, char **) {
                         m_CursorLine--;
                     }
                     m_CursorChanged = true;
+
+                    m_ShowLineAlways = true;
+m_LastInteractionTime = SDL_GetTicks();
                 }
 
                 if (event.key.key == SDLK_RETURN) {
@@ -385,8 +394,12 @@ int main(int, char **) {
                     m_CursorByteOffset = 0;
 
                     m_CursorChanged = true;
+
+                    m_ShowLineAlways = true;
+m_LastInteractionTime = SDL_GetTicks();
                 }
 
+                // 저장
                 if ((SDL_GetModState() & SDLK_LCTRL) &&
                     event.key.key == SDLK_S) {
                         SaveFile(m_Lines, m_FilePath);
@@ -394,10 +407,54 @@ int main(int, char **) {
                         m_IsDirty = false;
                         UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
                 }
+
+                if (event.key.key == SDLK_LEFT) {
+                    if (m_CursorByteOffset > 0) {
+                        std::string &line = m_Lines[m_CursorLine];
+                        int last_byte_length = GetPreviousCharByteLength(line, m_CursorByteOffset);
+                        m_CursorByteOffset -= last_byte_length;
+                    }
+                    else if (m_CursorLine > 0) {
+                        m_CursorLine--;
+                        m_CursorByteOffset = static_cast<int>(m_Lines[m_CursorLine].length());
+                    }
+
+                    m_ShowLineAlways = true;
+m_LastInteractionTime = SDL_GetTicks();
+                }
+
+if (event.key.key == SDLK_RIGHT) {
+    std::string &line = m_Lines[m_CursorLine];
+
+    // 1. 현재 라인 내에서 이동 가능한지 먼저 확인 (커서가 라인 끝이 아닌 경우)
+    if (m_CursorByteOffset < static_cast<int>(line.length())) {
+        int next_byte_length = GetNextCharByteLength(line, m_CursorByteOffset);
+        
+        // 이동 후에도 라인 범위 안쪽이면 이동
+        if (m_CursorByteOffset + next_byte_length <= static_cast<int>(line.length())) {
+            m_CursorByteOffset += next_byte_length;
+        } else {
+            // 문자가 깨져있거나 예외 상황일 경우, 1바이트씩이라도 이동하여 탈출
+            m_CursorByteOffset = static_cast<int>(line.length());
+        }
+    } 
+    // 2. 현재 라인 끝에 도달했다면 다음 줄로 이동
+    else if (m_CursorLine + 1 < static_cast<int>(m_Lines.size())) {
+        m_CursorLine++;
+        m_CursorByteOffset = 0;
+    }
+
+    m_ShowLineAlways = true;
+    m_LastInteractionTime = SDL_GetTicks();
+}
             }
 
+            // IME
             if (event.type == SDL_EVENT_TEXT_EDITING) {
                 m_CompositionText = event.edit.text;
+
+                m_ShowLineAlways = true;
+m_LastInteractionTime = SDL_GetTicks();
                 continue;
             }
 
@@ -419,12 +476,21 @@ int main(int, char **) {
                 }
 
                 m_CursorChanged = true;
+
+                m_ShowLineAlways = true;
+m_LastInteractionTime = SDL_GetTicks();
             }
         }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+
+        if (m_ShowLineAlways) {
+            if (SDL_GetTicks() - m_LastInteractionTime > SHOW_DURATION_MS) {
+                m_ShowLineAlways = false;
+            }
+        }
 
         {
             ImGuiWindowFlags window_flags =
@@ -570,8 +636,9 @@ int main(int, char **) {
                                     ImColor(100, 100, 100), 1.5f);
 
                                 current_x += comp_width;
+
                             } else {
-                                if (fmod(ImGui::GetTime(), 1.0f) < 0.5f) {
+                                if ((fmod(ImGui::GetTime(), 1.0f) < 0.5) || m_ShowLineAlways) {
                                     draw_list->AddRectFilled(
                                         ImVec2(current_x, box_top_y + 2.0f),
                                         ImVec2(current_x + 2.0f,

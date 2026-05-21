@@ -11,10 +11,10 @@
 #include <stdio.h>
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <filesystem>
 #include <vector>
 
 #include "imgui.h"
@@ -35,17 +35,20 @@ std::string ExecuteCommand(std::string command) {
     char buffer[128];
     std::string result;
 
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) return "*Error: pipe failed";
+    FILE *pipe = popen(command.c_str(), "r");
+    if (!pipe)
+        return "*Error: pipe failed";
 
     while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
         result += buffer;
     }
 
-    if (pclose(pipe) != 0) return "*Error: command failed";
+    if (pclose(pipe) != 0)
+        return "*Error: command failed";
 
-    if (!result.empty() && result.back() == '\n') result.pop_back();
-    
+    if (!result.empty() && result.back() == '\n')
+        result.pop_back();
+
     return result;
 }
 
@@ -61,11 +64,12 @@ std::string GetNativeFilePath() {
     return "*Error: Not support your system";
 }
 
-bool LoadFile(std::vector<std::string>& lines, std::string& filepath) {
+bool LoadFile(std::vector<std::string> &lines, std::string &filepath) {
     std::string path = GetNativeFilePath();
 
     std::ifstream file(path);
-    if (!file.is_open()) return false;
+    if (!file.is_open())
+        return false;
 
     lines.clear();
     std::string line;
@@ -78,7 +82,7 @@ bool LoadFile(std::vector<std::string>& lines, std::string& filepath) {
     return true;
 }
 
-bool SaveFile(std::vector<std::string>& lines, std::string filepath) {
+bool SaveFile(std::vector<std::string> &lines, std::string filepath) {
     std::ofstream s_file;
 
     s_file.open(filepath);
@@ -112,19 +116,24 @@ int GetNextCharByteLength(const std::string &str, int byte_offset) {
 
     unsigned char c = static_cast<unsigned char>(str[byte_offset]);
 
-    if (c < 0x80) return 1;
+    if (c < 0x80)
+        return 1;
 
-    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xE0) == 0xC0)
+        return 2;
 
-    if ((c & 0xF0) == 0xE0) return 3;
-    
-    if ((c & 0xF8) == 0xF0) return 4;
+    if ((c & 0xF0) == 0xE0)
+        return 3;
+
+    if ((c & 0xF8) == 0xF0)
+        return 4;
 
     return 1;
 }
 
 int GetPreviousCharByteLength(const std::string &str, int byte_offset) {
-    if (byte_offset <= 0 || byte_offset > (int)str.length()) return 0;
+    if (byte_offset <= 0 || byte_offset > (int)str.length())
+        return 0;
     int len = 1;
     while (len <= 4 && byte_offset - len >= 0) {
         unsigned char c = (unsigned char)str[byte_offset - len];
@@ -228,8 +237,6 @@ std::string GetFileNameFromPath(std::string filepath) {
     return filename;
 }
 
-
-
 int main(int, char **) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         printf("Error: SDL_Init(): %s\n", SDL_GetError());
@@ -327,8 +334,8 @@ int main(int, char **) {
     static bool m_CursorChanged = false;
     static std::string m_FilePath = "";
     static bool m_ShowLineAlways = false;
-    static Uint64 m_LastInteractionTime = 0; // 마지막 상호작용 시간 저장
-    const Uint64 SHOW_DURATION_MS = 200;    // 2초 동안 표시
+    static Uint64 m_LastInteractionTime = 0;
+    const Uint64 SHOW_DURATION_MS = 200;
 
     static std::string m_CompositionText = "";
 
@@ -375,7 +382,7 @@ int main(int, char **) {
                     m_CursorChanged = true;
 
                     m_ShowLineAlways = true;
-m_LastInteractionTime = SDL_GetTicks();
+                    m_LastInteractionTime = SDL_GetTicks();
                 }
 
                 if (event.key.key == SDLK_RETURN) {
@@ -396,57 +403,58 @@ m_LastInteractionTime = SDL_GetTicks();
                     m_CursorChanged = true;
 
                     m_ShowLineAlways = true;
-m_LastInteractionTime = SDL_GetTicks();
+                    m_LastInteractionTime = SDL_GetTicks();
                 }
 
                 // 저장
                 if ((SDL_GetModState() & SDLK_LCTRL) &&
                     event.key.key == SDLK_S) {
-                        SaveFile(m_Lines, m_FilePath);
+                    SaveFile(m_Lines, m_FilePath);
 
-                        m_IsDirty = false;
-                        UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
+                    m_IsDirty = false;
+                    UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath),
+                                      m_IsDirty);
                 }
 
                 if (event.key.key == SDLK_LEFT) {
                     if (m_CursorByteOffset > 0) {
                         std::string &line = m_Lines[m_CursorLine];
-                        int last_byte_length = GetPreviousCharByteLength(line, m_CursorByteOffset);
+                        int last_byte_length =
+                            GetPreviousCharByteLength(line, m_CursorByteOffset);
                         m_CursorByteOffset -= last_byte_length;
-                    }
-                    else if (m_CursorLine > 0) {
+                    } else if (m_CursorLine > 0) {
                         m_CursorLine--;
-                        m_CursorByteOffset = static_cast<int>(m_Lines[m_CursorLine].length());
+                        m_CursorByteOffset =
+                            static_cast<int>(m_Lines[m_CursorLine].length());
                     }
 
                     m_ShowLineAlways = true;
-m_LastInteractionTime = SDL_GetTicks();
+                    m_LastInteractionTime = SDL_GetTicks();
                 }
 
-if (event.key.key == SDLK_RIGHT) {
-    std::string &line = m_Lines[m_CursorLine];
+                if (event.key.key == SDLK_RIGHT) {
+                    std::string &line = m_Lines[m_CursorLine];
 
-    // 1. 현재 라인 내에서 이동 가능한지 먼저 확인 (커서가 라인 끝이 아닌 경우)
-    if (m_CursorByteOffset < static_cast<int>(line.length())) {
-        int next_byte_length = GetNextCharByteLength(line, m_CursorByteOffset);
-        
-        // 이동 후에도 라인 범위 안쪽이면 이동
-        if (m_CursorByteOffset + next_byte_length <= static_cast<int>(line.length())) {
-            m_CursorByteOffset += next_byte_length;
-        } else {
-            // 문자가 깨져있거나 예외 상황일 경우, 1바이트씩이라도 이동하여 탈출
-            m_CursorByteOffset = static_cast<int>(line.length());
-        }
-    } 
-    // 2. 현재 라인 끝에 도달했다면 다음 줄로 이동
-    else if (m_CursorLine + 1 < static_cast<int>(m_Lines.size())) {
-        m_CursorLine++;
-        m_CursorByteOffset = 0;
-    }
+                    if (m_CursorByteOffset < static_cast<int>(line.length())) {
+                        int next_byte_length =
+                            GetNextCharByteLength(line, m_CursorByteOffset);
 
-    m_ShowLineAlways = true;
-    m_LastInteractionTime = SDL_GetTicks();
-}
+                        if (m_CursorByteOffset + next_byte_length <=
+                            static_cast<int>(line.length())) {
+                            m_CursorByteOffset += next_byte_length;
+                        } else {
+                            m_CursorByteOffset =
+                                static_cast<int>(line.length());
+                        }
+                    } else if (m_CursorLine + 1 <
+                               static_cast<int>(m_Lines.size())) {
+                        m_CursorLine++;
+                        m_CursorByteOffset = 0;
+                    }
+
+                    m_ShowLineAlways = true;
+                    m_LastInteractionTime = SDL_GetTicks();
+                }
             }
 
             // IME
@@ -454,14 +462,15 @@ if (event.key.key == SDLK_RIGHT) {
                 m_CompositionText = event.edit.text;
 
                 m_ShowLineAlways = true;
-m_LastInteractionTime = SDL_GetTicks();
+                m_LastInteractionTime = SDL_GetTicks();
                 continue;
             }
 
             if (event.type == SDL_EVENT_TEXT_INPUT) {
                 if (!m_IsDirty) {
                     m_IsDirty = true;
-                    UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
+                    UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath),
+                                      m_IsDirty);
                 }
 
                 m_CompositionText.clear();
@@ -478,7 +487,7 @@ m_LastInteractionTime = SDL_GetTicks();
                 m_CursorChanged = true;
 
                 m_ShowLineAlways = true;
-m_LastInteractionTime = SDL_GetTicks();
+                m_LastInteractionTime = SDL_GetTicks();
             }
         }
 
@@ -511,12 +520,14 @@ m_LastInteractionTime = SDL_GetTicks();
                 if (ImGui::BeginMenuBar()) {
 
                     if (ImGui::BeginMenu("File")) {
-                        if (ImGui::MenuItem("Open")) { 
+                        if (ImGui::MenuItem("Open")) {
                             LoadFile(m_Lines, m_FilePath);
 
-                            UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
+                            UpdateWindowTitle(window,
+                                              GetFileNameFromPath(m_FilePath),
+                                              m_IsDirty);
                         }
-                        if (ImGui::MenuItem("Save")) { 
+                        if (ImGui::MenuItem("Save")) {
                             if (m_FilePath == "") {
                                 m_FilePath = GetNativeFilePath();
                             }
@@ -638,7 +649,8 @@ m_LastInteractionTime = SDL_GetTicks();
                                 current_x += comp_width;
 
                             } else {
-                                if ((fmod(ImGui::GetTime(), 1.0f) < 0.5) || m_ShowLineAlways) {
+                                if ((fmod(ImGui::GetTime(), 1.0f) < 0.5) ||
+                                    m_ShowLineAlways) {
                                     draw_list->AddRectFilled(
                                         ImVec2(current_x, box_top_y + 2.0f),
                                         ImVec2(current_x + 2.0f,

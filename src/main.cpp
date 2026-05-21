@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <filesystem>
 #include <vector>
 
 #include "imgui.h"
@@ -27,8 +28,75 @@
 #include <SDL3/SDL_opengl.h>
 #endif
 
-#define TITLE_PREFIX "file.txt - LeafEdit "
+#define TITLE_PREFIX "LeafEdit "
 #define VERSION "a0.1"
+
+std::string ExecuteCommand(std::string command) {
+    char buffer[128];
+    std::string result;
+
+    FILE* pipe = popen(command.c_str(), "r");
+    if (!pipe) return "*Error: pipe failed";
+
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        result += buffer;
+    }
+
+    if (pclose(pipe) != 0) return "*Error: command failed";
+
+    if (!result.empty() && result.back() == '\n') result.pop_back();
+    
+    return result;
+}
+
+std::string GetNativeFilePath() {
+    if (system("command -v zenity") == 0) {
+        return ExecuteCommand("zenity --file-selection");
+    } else if (system("command -v kdialog") == 0) {
+        return ExecuteCommand("kdialog --getopenfilename");
+    } else if (system("command -v yad") == 0) {
+        return ExecuteCommand("yad --file");
+    }
+
+    return "*Error: Not support your system";
+}
+
+bool LoadFile(std::vector<std::string>& lines, std::string& filepath) {
+    std::string path = GetNativeFilePath();
+
+    std::ifstream file(path);
+    if (!file.is_open()) return false;
+
+    lines.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
+    }
+
+    filepath = path;
+
+    return true;
+}
+
+bool SaveFile(std::vector<std::string>& lines, std::string filepath) {
+    std::ofstream s_file;
+
+    s_file.open(filepath);
+    if (s_file.is_open()) {
+        for (size_t i = 0; i < lines.size(); ++i) {
+            if (i > 0) {
+                s_file << "\n";
+            }
+            s_file << lines[i];
+        }
+    } else {
+        return false;
+    }
+
+    s_file.close();
+
+    return true;
+}
 
 void UpdateWindowTitle(SDL_Window *window, const std::string &filename,
                        bool is_dirty) {
@@ -155,6 +223,13 @@ void ConfigureLinuxNativeFont(ImFontConfig &config) {
     FcPatternDestroy(pattern);
 }
 
+std::string GetFileNameFromPath(std::string filepath) {
+    std::filesystem::path p(filepath);
+    std::string filename = p.filename().string();
+
+    return filename;
+}
+
 int main(int, char **) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         printf("Error: SDL_Init(): %s\n", SDL_GetError());
@@ -250,6 +325,7 @@ int main(int, char **) {
     static int m_CursorByteOffset = 0;
     static bool m_IsDirty = false;
     static bool m_CursorChanged = false;
+    static std::string m_FilePath = "";
 
     static std::string m_CompositionText = "";
 
@@ -313,24 +389,10 @@ int main(int, char **) {
 
                 if ((SDL_GetModState() & SDLK_LCTRL) &&
                     event.key.key == SDLK_S) {
-                    std::ofstream s_file;
+                        SaveFile(m_Lines, m_FilePath);
 
-                    s_file.open("file.txt");
-                    if (s_file.is_open()) {
-                        for (size_t i = 0; i < m_Lines.size(); ++i) {
-                            if (i > 0) {
-                                s_file << "\n";
-                            }
-                            s_file << m_Lines[i];
-                        }
-                    }
-
-                    SDL_SetWindowTitle(window, TITLE_PREFIX VERSION);
-
-                    s_file.close();
-
-                    m_IsDirty = false;
-                    UpdateWindowTitle(window, "file.txt", m_IsDirty);
+                        m_IsDirty = false;
+                        UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
                 }
             }
 
@@ -342,7 +404,7 @@ int main(int, char **) {
             if (event.type == SDL_EVENT_TEXT_INPUT) {
                 if (!m_IsDirty) {
                     m_IsDirty = true;
-                    UpdateWindowTitle(window, "file.txt", m_IsDirty);
+                    UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
                 }
 
                 m_CompositionText.clear();
@@ -383,9 +445,19 @@ int main(int, char **) {
                 if (ImGui::BeginMenuBar()) {
 
                     if (ImGui::BeginMenu("File")) {
-                        if (ImGui::MenuItem("Open")) { /* ... */
+                        if (ImGui::MenuItem("Open")) { 
+                            LoadFile(m_Lines, m_FilePath);
+
+                            UpdateWindowTitle(window, GetFileNameFromPath(m_FilePath), m_IsDirty);
                         }
-                        if (ImGui::MenuItem("Save")) { /* ... */
+                        if (ImGui::MenuItem("Save")) { 
+                            if (m_FilePath == "") {
+                                m_FilePath = GetNativeFilePath();
+                            }
+                            SaveFile(m_Lines, m_FilePath);
+
+                            m_IsDirty = false;
+                            UpdateWindowTitle(window, m_FilePath, m_IsDirty);
                         }
                         ImGui::EndMenu();
                     }

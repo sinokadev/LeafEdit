@@ -29,7 +29,7 @@
 #endif
 
 #define TITLE_PREFIX "LeafEdit "
-#define VERSION "a0.1"
+#define VERSION "a1.0"
 
 static std::vector<std::string> m_Lines = {""};
 static int m_CursorLine = 0;

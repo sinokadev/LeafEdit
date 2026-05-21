@@ -31,6 +31,17 @@
 #define TITLE_PREFIX "LeafEdit "
 #define VERSION "a0.1"
 
+static std::vector<std::string> m_Lines = {""};
+static int m_CursorLine = 0;
+static int m_CursorByteOffset = 0;
+static bool m_IsDirty = false;
+static bool m_CursorChanged = false;
+static std::string m_FilePath = "";
+static bool m_ShowLineAlways = false;
+static int m_CursorColumn = 0;
+static Uint64 m_LastInteractionTime = 0;
+const Uint64 SHOW_DURATION_MS = 200;
+
 std::string ExecuteCommand(std::string command) {
     char buffer[128];
     std::string result;
@@ -144,6 +155,96 @@ int GetPreviousCharByteLength(const std::string &str, int byte_offset) {
         len++;
     }
     return 1;
+}
+
+int GetCharByteLength(const std::string &line, int byteOffset) {
+    if (byteOffset < 0 || byteOffset >= static_cast<int>(line.length()))
+        return 1;
+    unsigned char c = static_cast<unsigned char>(line[byteOffset]);
+    if (c <= 0x7F)
+        return 1; // ASCII
+    if ((c & 0xE0) == 0xC0)
+        return 2;
+    if ((c & 0xF0) == 0xE0)
+        return 3;
+    if ((c & 0xF8) == 0xF0)
+        return 4;
+    return 1;
+}
+
+int GetByteOffsetFromCharIndex(const std::string &line, int targetCharIndex) {
+    int byteOffset = 0;
+    int charCount = 0;
+    while (charCount < targetCharIndex &&
+           byteOffset < static_cast<int>(line.length())) {
+        byteOffset += GetCharByteLength(line, byteOffset);
+        charCount++;
+    }
+    return byteOffset;
+}
+
+int GetCharIndexFromByteOffset(const std::string &line, int byteOffset) {
+    int charCount = 0;
+    int currentByte = 0;
+    while (currentByte < byteOffset &&
+           currentByte < static_cast<int>(line.length())) {
+        currentByte += GetCharByteLength(line, currentByte);
+        charCount++;
+    }
+    return charCount;
+}
+
+int GetVisualWidth(const std::string &line, int byteOffset) {
+    unsigned char c = static_cast<unsigned char>(line[byteOffset]);
+
+    if (c <= 0x7F)
+        return 1;
+
+    return 2;
+}
+
+int GetVisualColumnFromByteOffset(const std::string &line, int byteOffset) {
+    int visualColumn = 0;
+    int currentByte = 0;
+    while (currentByte < byteOffset && currentByte < (int)line.length()) {
+        visualColumn += GetVisualWidth(line, currentByte);
+        currentByte += GetCharByteLength(line, currentByte);
+    }
+    return visualColumn;
+}
+
+int GetByteOffsetFromVisualColumn(const std::string &line,
+                                  int targetVisualColumn) {
+    int visualColumn = 0;
+    int byteOffset = 0;
+    while (visualColumn < targetVisualColumn &&
+           byteOffset < (int)line.length()) {
+        int width = GetVisualWidth(line, byteOffset);
+        if (visualColumn + width > targetVisualColumn)
+            break;
+
+        visualColumn += width;
+        byteOffset += GetCharByteLength(line, byteOffset);
+    }
+    return byteOffset;
+}
+
+void MoveVertical(int delta) {
+    int nextLine = m_CursorLine + delta;
+    if (nextLine < 0 || nextLine >= (int)m_Lines.size())
+        return;
+
+    m_CursorColumn = GetVisualColumnFromByteOffset(m_Lines[m_CursorLine],
+                                                   m_CursorByteOffset);
+
+    m_CursorLine = nextLine;
+
+    m_CursorByteOffset =
+        GetByteOffsetFromVisualColumn(m_Lines[m_CursorLine], m_CursorColumn);
+
+    m_CursorChanged = true;
+    m_ShowLineAlways = true;
+    m_LastInteractionTime = SDL_GetTicks();
 }
 
 std::string GetLinuxSystemMonospaceFontPath() {
@@ -327,16 +428,6 @@ int main(int, char **) {
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    static std::vector<std::string> m_Lines = {""};
-    static int m_CursorLine = 0;
-    static int m_CursorByteOffset = 0;
-    static bool m_IsDirty = false;
-    static bool m_CursorChanged = false;
-    static std::string m_FilePath = "";
-    static bool m_ShowLineAlways = false;
-    static Uint64 m_LastInteractionTime = 0;
-    const Uint64 SHOW_DURATION_MS = 200;
-
     static std::string m_CompositionText = "";
 
     SDL_StartTextInput(window);
@@ -428,6 +519,8 @@ int main(int, char **) {
                             static_cast<int>(m_Lines[m_CursorLine].length());
                     }
 
+                    m_CursorColumn = GetCharIndexFromByteOffset(
+                        m_Lines[m_CursorLine], m_CursorByteOffset);
                     m_ShowLineAlways = true;
                     m_LastInteractionTime = SDL_GetTicks();
                 }
@@ -452,6 +545,20 @@ int main(int, char **) {
                         m_CursorByteOffset = 0;
                     }
 
+                    m_CursorColumn = GetCharIndexFromByteOffset(
+                        m_Lines[m_CursorLine], m_CursorByteOffset);
+                    m_ShowLineAlways = true;
+                    m_LastInteractionTime = SDL_GetTicks();
+                }
+
+                if (event.key.key == SDLK_UP) {
+                    MoveVertical(-1);
+                    m_ShowLineAlways = true;
+                    m_LastInteractionTime = SDL_GetTicks();
+                }
+
+                if (event.key.key == SDLK_DOWN) {
+                    MoveVertical(1);
                     m_ShowLineAlways = true;
                     m_LastInteractionTime = SDL_GetTicks();
                 }

@@ -6,6 +6,25 @@ An **immediate-mode** GUI text editor. Very simple and lightweight. It supports 
 
 This text editor prioritizes the latest versions of Ubuntu and Fedora. Windows and macOS support is not currently on our roadmap.
 
+## Build
+
+Need packages: SDL3, FreeType, OpenGL3
+
+Need tools: CMake, Make, [Just](https://just.systems/)
+
+```bash
+$ just setup
+$ just # running program
+```
+
+or use Cmake
+
+```bash
+$ cmake -S . -B build
+$ cmake --build build
+$ ./build/leafedit
+```
+
 ## History
 
 - 2026-05-18 - Repository created. Project started!
